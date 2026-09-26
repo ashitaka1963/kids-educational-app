@@ -1,0 +1,43 @@
+# 依存関係
+node_modules/
+
+# ビルド成果物
+dist/
+dist-ssr/
+build/
+
+# TypeScript ビルドキャッシュ
+*.tsbuildinfo
+
+# Vite キャッシュ
+.vite/
+
+# 環境変数
+.env
+.env.local
+.env.*.local
+
+# エディタ / IDE
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS 生成ファイル
+.DS_Store
+Thumbs.db
+
+# ログ
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+logs/
+*.log
+
+# テストカバレッジ
+coverage/
