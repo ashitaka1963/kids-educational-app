@@ -1,3 +1,4 @@
+import React, { useEffect } from 'react';
 import { Volume2, VolumeX, Sparkles } from 'lucide-react';
 import { soundManager } from '../utils/sound';
 import { speechManager } from '../utils/speech';

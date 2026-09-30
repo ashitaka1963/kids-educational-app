@@ -1,3 +1,4 @@
+import React, { useRef, useState, useEffect } from 'react';
 import { Trash2, Eraser, Undo2 } from 'lucide-react';
 import { Header } from '../components/Header';
 import { soundManager } from '../utils/sound';
