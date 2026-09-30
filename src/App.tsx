@@ -20,6 +20,7 @@ import { DrumGame } from './games/DrumGame';
 import { LengthGame } from './games/LengthGame';
 import { WashGame } from './games/WashGame';
 import { ZoomQuizGame } from './games/ZoomQuizGame';
+import { DrawingCanvas } from './games/DrawingCanvas';
 import { soundManager } from './utils/sound';
 
 export const App: React.FC = () => {
@@ -71,6 +72,13 @@ export const App: React.FC = () => {
       {currentMode === 'menu' && (
         <MainMenu
           onSelectGame={(game) => setCurrentMode(game)}
+          starsCount={starsCount}
+        />
+      )}
+
+      {currentMode === 'drawing' && (
+        <DrawingCanvas
+          onHome={handleHome}
           starsCount={starsCount}
         />
       )}
