@@ -16,7 +16,15 @@ export type GameMode =
   | 'feed'
   | 'soundquiz'
   | 'halfpuzzle'
-  | 'more';
+  | 'more'
+  | 'face'
+  | 'weather'
+  | 'parentchild'
+  | 'cleanup'
+  | 'drum'
+  | 'length'
+  | 'wash'
+  | 'zoomquiz';
 
 interface MainMenuProps {
   onSelectGame: (game: GameMode) => void;
@@ -179,6 +187,94 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame, starsCount }) 
       textColor: 'text-rose-950',
       badgeColor: 'bg-pink-100 text-pink-900',
     },
+    {
+      id: 'face' as GameMode,
+      title: 'どんなおかお？',
+      subtitle: 'にこにこ？ えんえん？',
+      emoji: '😊',
+      badge: 'きもち',
+      bgColor: 'bg-gradient-to-br from-yellow-300 to-amber-400',
+      borderColor: 'border-amber-500',
+      textColor: 'text-amber-950',
+      badgeColor: 'bg-yellow-100 text-yellow-900',
+    },
+    {
+      id: 'weather' as GameMode,
+      title: 'おそらのおてんき',
+      subtitle: 'あめのひは なにもっていく？',
+      emoji: '☀️',
+      badge: 'おてんき',
+      bgColor: 'bg-gradient-to-br from-sky-400 to-teal-500',
+      borderColor: 'border-teal-600',
+      textColor: 'text-sky-950',
+      badgeColor: 'bg-sky-100 text-sky-900',
+    },
+    {
+      id: 'parentchild' as GameMode,
+      title: 'おやこあわせ',
+      subtitle: 'おかあさんは だれかな？',
+      emoji: '🐣',
+      badge: 'なかよし',
+      bgColor: 'bg-gradient-to-br from-amber-300 to-orange-400',
+      borderColor: 'border-orange-500',
+      textColor: 'text-amber-950',
+      badgeColor: 'bg-amber-100 text-amber-900',
+    },
+    {
+      id: 'cleanup' as GameMode,
+      title: 'おもちゃおかたづけ',
+      subtitle: 'タッチして はこにぽいっ！',
+      emoji: '📦',
+      badge: 'せいかつ',
+      bgColor: 'bg-gradient-to-br from-emerald-400 to-green-500',
+      borderColor: 'border-green-600',
+      textColor: 'text-emerald-950',
+      badgeColor: 'bg-emerald-100 text-emerald-900',
+    },
+    {
+      id: 'drum' as GameMode,
+      title: 'ポンポンたいこ',
+      subtitle: 'ドンドン！カッカッ！',
+      emoji: '🥁',
+      badge: 'リズム',
+      bgColor: 'bg-gradient-to-br from-red-400 to-rose-500',
+      borderColor: 'border-rose-600',
+      textColor: 'text-red-950',
+      badgeColor: 'bg-red-100 text-red-900',
+    },
+    {
+      id: 'length' as GameMode,
+      title: 'ながいのはどっち？',
+      subtitle: 'なが〜いでんしゃは どっち？',
+      emoji: '📏',
+      badge: 'ながさ',
+      bgColor: 'bg-gradient-to-br from-teal-400 to-emerald-500',
+      borderColor: 'border-emerald-600',
+      textColor: 'text-teal-950',
+      badgeColor: 'bg-teal-100 text-teal-900',
+    },
+    {
+      id: 'wash' as GameMode,
+      title: 'あわあわぴかぴか',
+      subtitle: 'タッチして ピッカピカ！',
+      emoji: '🧼',
+      badge: 'てあらい',
+      bgColor: 'bg-gradient-to-br from-cyan-400 to-blue-500',
+      borderColor: 'border-blue-600',
+      textColor: 'text-cyan-950',
+      badgeColor: 'bg-cyan-100 text-cyan-900',
+    },
+    {
+      id: 'zoomquiz' as GameMode,
+      title: 'これな〜んだ？',
+      subtitle: 'どアップの これ、だれかな？',
+      emoji: '🔍',
+      badge: 'すいり',
+      bgColor: 'bg-gradient-to-br from-violet-400 to-purple-500',
+      borderColor: 'border-purple-600',
+      textColor: 'text-purple-950',
+      badgeColor: 'bg-purple-100 text-purple-900',
+    },
   ];
 
   return (
@@ -218,14 +314,14 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame, starsCount }) 
         </div>
       </header>
 
-      {/* スクロール可能なメインコンテンツ（全12ゲーム） */}
+      {/* スクロール可能なメインコンテンツ（全20ゲーム） */}
       <main className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6 max-w-5xl mx-auto w-full">
         {/* ガイダンス見出し */}
         <div className="mb-4 text-center">
           <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-white/90 border-2 border-amber-300 shadow-sm">
             <Sparkles className="w-5 h-5 text-amber-500 animate-spin" />
             <span className="text-lg sm:text-2xl font-black text-amber-950">
-              すきな あそびを えらんでね！（ぜんぶで 12しゅるい）
+              すきな あそびを えらんでね！（ぜんぶで 20しゅるい！）
             </span>
           </div>
         </div>

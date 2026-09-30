@@ -12,6 +12,14 @@ import { FeedGame } from './games/FeedGame';
 import { SoundQuizGame } from './games/SoundQuizGame';
 import { HalfPuzzleGame } from './games/HalfPuzzleGame';
 import { MoreGame } from './games/MoreGame';
+import { FaceGame } from './games/FaceGame';
+import { WeatherGame } from './games/WeatherGame';
+import { ParentChildGame } from './games/ParentChildGame';
+import { CleanUpGame } from './games/CleanUpGame';
+import { DrumGame } from './games/DrumGame';
+import { LengthGame } from './games/LengthGame';
+import { WashGame } from './games/WashGame';
+import { ZoomQuizGame } from './games/ZoomQuizGame';
 import { soundManager } from './utils/sound';
 
 export const App: React.FC = () => {
@@ -157,6 +165,70 @@ export const App: React.FC = () => {
 
       {currentMode === 'more' && (
         <MoreGame
+          onHome={handleHome}
+          starsCount={starsCount}
+          onAddStar={handleAddStar}
+        />
+      )}
+
+      {currentMode === 'face' && (
+        <FaceGame
+          onHome={handleHome}
+          starsCount={starsCount}
+          onAddStar={handleAddStar}
+        />
+      )}
+
+      {currentMode === 'weather' && (
+        <WeatherGame
+          onHome={handleHome}
+          starsCount={starsCount}
+          onAddStar={handleAddStar}
+        />
+      )}
+
+      {currentMode === 'parentchild' && (
+        <ParentChildGame
+          onHome={handleHome}
+          starsCount={starsCount}
+          onAddStar={handleAddStar}
+        />
+      )}
+
+      {currentMode === 'cleanup' && (
+        <CleanUpGame
+          onHome={handleHome}
+          starsCount={starsCount}
+          onAddStar={handleAddStar}
+        />
+      )}
+
+      {currentMode === 'drum' && (
+        <DrumGame
+          onHome={handleHome}
+          starsCount={starsCount}
+          onAddStar={handleAddStar}
+        />
+      )}
+
+      {currentMode === 'length' && (
+        <LengthGame
+          onHome={handleHome}
+          starsCount={starsCount}
+          onAddStar={handleAddStar}
+        />
+      )}
+
+      {currentMode === 'wash' && (
+        <WashGame
+          onHome={handleHome}
+          starsCount={starsCount}
+          onAddStar={handleAddStar}
+        />
+      )}
+
+      {currentMode === 'zoomquiz' && (
+        <ZoomQuizGame
           onHome={handleHome}
           starsCount={starsCount}
           onAddStar={handleAddStar}
