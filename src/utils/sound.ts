@@ -230,6 +230,54 @@ class SoundManager {
     osc.start(now);
     osc.stop(now + 0.09);
   }
+
+  // クラクション（プップー！）
+  public playHorn() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    [0, 0.12].forEach((delay) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const now = ctx.currentTime + delay;
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(420, now);
+
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.09);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.09);
+    });
+  }
+
+  // パトカー・消防車サイレン（ウ〜〜！）
+  public playSiren() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const now = ctx.currentTime;
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(700, now);
+    osc.frequency.linearRampToValueAtTime(950, now + 0.25);
+    osc.frequency.linearRampToValueAtTime(700, now + 0.5);
+
+    gain.gain.setValueAtTime(0.25, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.5);
+  }
 }
 
 export const soundManager = new SoundManager();

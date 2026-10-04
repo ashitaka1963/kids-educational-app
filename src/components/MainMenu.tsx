@@ -6,6 +6,7 @@ import { speechManager } from '../utils/speech';
 export type GameMode =
   | 'menu'
   | 'drawing'
+  | 'cartown'
   | 'match'
   | 'odd'
   | 'category'
@@ -317,33 +318,57 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame, starsCount }) 
 
       {/* スクロール可能なメインコンテンツ */}
       <main className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6 max-w-5xl mx-auto w-full">
-        {/* 特別バナー：おえかきキャンバス */}
-        <div className="mb-4">
+        {/* 特別バナー（おえかき ＆ くるまタウン） */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-5">
+          {/* おえかきキャンバス */}
           <button
             onClick={() => handleGameSelect('drawing', 'おえかき')}
-            className="kid-btn w-full rounded-3xl p-4 sm:p-5 bg-gradient-to-r from-pink-400 via-purple-400 to-indigo-400 border-4 border-purple-500 shadow-xl flex items-center justify-between overflow-hidden group hover:scale-[1.01] hover:shadow-2xl transition-all relative"
+            className="kid-btn rounded-3xl p-4 bg-gradient-to-r from-pink-400 via-purple-400 to-indigo-400 border-4 border-purple-500 shadow-xl flex items-center justify-between overflow-hidden group hover:scale-[1.01] hover:shadow-2xl transition-all relative"
           >
-            <div className="absolute -right-8 -top-8 w-40 h-40 bg-white/20 rounded-full blur-sm pointer-events-none" />
-            <div className="flex items-center gap-3 sm:gap-4 z-10">
-              <div className="w-14 h-14 sm:w-18 sm:h-18 rounded-2xl bg-white/95 shadow-md flex items-center justify-center border-2 border-white/60 group-hover:rotate-12 transition-transform text-3xl sm:text-4xl">
+            <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/20 rounded-full blur-sm pointer-events-none" />
+            <div className="flex items-center gap-3 z-10">
+              <div className="w-14 h-14 rounded-2xl bg-white/95 shadow-md flex items-center justify-center border-2 border-white/60 group-hover:rotate-12 transition-transform text-3xl">
                 🎨
               </div>
               <div className="text-left">
-                <span className="inline-block px-3 py-0.5 rounded-full text-xs font-black mb-1 bg-white/90 text-purple-900 shadow-sm">
+                <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-black mb-1 bg-white/90 text-purple-900 shadow-sm">
                   ★ じゆうにお絵描き ★
                 </span>
-                <h2 className="text-2xl sm:text-3xl font-black text-white drop-shadow-sm leading-tight">
+                <h2 className="text-xl sm:text-2xl font-black text-white drop-shadow-sm leading-tight">
                   おえかき キャンバス
                 </h2>
-                <p className="text-white/90 font-bold text-xs sm:text-sm drop-shadow">
-                  すきな えんぴつと いろを えらんで お絵描きしよう！
+                <p className="text-white/90 font-bold text-xs drop-shadow">
+                  すきな えんぴつと いろで お絵描き！
                 </p>
               </div>
             </div>
-            <div className="hidden sm:flex items-center gap-1 z-10 text-3xl animate-bounce-short">
-              <span>✏️</span>
-              <span>🖍️</span>
-              <span>✨</span>
+          </button>
+
+          {/* くるまタウン */}
+          <button
+            onClick={() => handleGameSelect('cartown', 'くるまタウン')}
+            className="kid-btn rounded-3xl p-4 bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-500 border-4 border-emerald-500 shadow-xl flex items-center justify-between overflow-hidden group hover:scale-[1.01] hover:shadow-2xl transition-all relative"
+          >
+            <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/20 rounded-full blur-sm pointer-events-none" />
+            <div className="flex items-center gap-3 z-10">
+              <div className="w-14 h-14 rounded-2xl bg-white/95 shadow-md flex items-center justify-center border-2 border-white/60 group-hover:rotate-12 transition-transform text-3xl">
+                🚗
+              </div>
+              <div className="text-left">
+                <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-black mb-1 bg-white/90 text-emerald-900 shadow-sm">
+                  ★ まちを走ろう ★
+                </span>
+                <h2 className="text-xl sm:text-2xl font-black text-white drop-shadow-sm leading-tight">
+                  くるまタウン
+                </h2>
+                <p className="text-white/90 font-bold text-xs drop-shadow">
+                  パトカーや消防車を 走らせよう！
+                </p>
+              </div>
+            </div>
+            <div className="hidden sm:flex items-center gap-1 z-10 text-2xl animate-bounce-short">
+              <span>🚓</span>
+              <span>🚒</span>
             </div>
           </button>
         </div>

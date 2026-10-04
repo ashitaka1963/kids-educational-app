@@ -21,6 +21,7 @@ import { LengthGame } from './games/LengthGame';
 import { WashGame } from './games/WashGame';
 import { ZoomQuizGame } from './games/ZoomQuizGame';
 import { DrawingCanvas } from './games/DrawingCanvas';
+import { CarTownGame } from './games/CarTownGame';
 import { soundManager } from './utils/sound';
 
 export const App: React.FC = () => {
@@ -78,6 +79,13 @@ export const App: React.FC = () => {
 
       {currentMode === 'drawing' && (
         <DrawingCanvas
+          onHome={handleHome}
+          starsCount={starsCount}
+        />
+      )}
+
+      {currentMode === 'cartown' && (
+        <CarTownGame
           onHome={handleHome}
           starsCount={starsCount}
         />
