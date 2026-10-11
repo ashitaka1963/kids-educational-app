@@ -377,18 +377,27 @@ export const TrainTrackGame: React.FC<TrainTrackGameProps> = ({ onHome, starsCou
     }
   };
 
-  // 電車をタップした時のホップ＆汽笛
+  // 電車をタップした時：車庫にもどす
   const handleTapTrain = (trainId: string, e: React.MouseEvent | React.PointerEvent) => {
     e.stopPropagation();
-    soundManager.playWhistle();
-    setActiveTrains(prev =>
-      prev.map(t => (t.id === trainId ? { ...t, isJumping: true } : t))
-    );
-    setTimeout(() => {
-      setActiveTrains(prev =>
-        prev.map(t => (t.id === trainId ? { ...t, isJumping: false } : t))
-      );
-    }, 450);
+    const target = activeTrains.find(t => t.id === trainId);
+    if (!target) return;
+
+    const trainInfo = TRAINS[target.typeIndex];
+    soundManager.playBubble();
+
+    const nextList = activeTrains.filter(t => t.id !== trainId);
+    setActiveTrains(nextList);
+    activeTrainsRef.current = nextList;
+
+    speechManager.speak(`${trainInfo.label}、しゃこに もどるよ！`);
+    setStatusMsg(`${trainInfo.label}が 車庫にもどったよ！🏠（そうこう中: ${nextList.length}/${MAX_TRAINS}だい）`);
+
+    if (nextList.length === 0) {
+      setIsRunning(false);
+      isRunningRef.current = false;
+      cancelAnimationFrame(animFrameRef.current);
+    }
   };
 
   // 分岐ポイントの切り替え
