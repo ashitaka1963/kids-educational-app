@@ -22,6 +22,8 @@ import { WashGame } from './games/WashGame';
 import { ZoomQuizGame } from './games/ZoomQuizGame';
 import { DrawingCanvas } from './games/DrawingCanvas';
 import { CarTownGame } from './games/CarTownGame';
+import { TrainTrackGame } from './games/TrainTrackGame';
+import { AirHockeyGame } from './games/AirHockeyGame';
 import { soundManager } from './utils/sound';
 
 export const App: React.FC = () => {
@@ -88,6 +90,21 @@ export const App: React.FC = () => {
         <CarTownGame
           onHome={handleHome}
           starsCount={starsCount}
+        />
+      )}
+
+      {currentMode === 'traintrack' && (
+        <TrainTrackGame
+          onHome={handleHome}
+          starsCount={starsCount}
+        />
+      )}
+
+      {currentMode === 'hockey' && (
+        <AirHockeyGame
+          onHome={handleHome}
+          starsCount={starsCount}
+          onAddStar={handleAddStar}
         />
       )}
 

@@ -7,6 +7,8 @@ export type GameMode =
   | 'menu'
   | 'drawing'
   | 'cartown'
+  | 'traintrack'
+  | 'hockey'
   | 'match'
   | 'odd'
   | 'category'
@@ -318,7 +320,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame, starsCount }) 
 
       {/* スクロール可能なメインコンテンツ */}
       <main className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6 max-w-5xl mx-auto w-full">
-        {/* 特別バナー（おえかき ＆ くるまタウン） */}
+        {/* 特別バナー（おえかき・くるま・せんろ・ホッケー） */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-5">
           {/* おえかきキャンバス */}
           <button
@@ -338,7 +340,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame, starsCount }) 
                   おえかき キャンバス
                 </h2>
                 <p className="text-white/90 font-bold text-xs drop-shadow">
-                  すきな えんぴつと いろで お絵描き！
+                  24種類のスタンプや えんぴつで お絵描き！
                 </p>
               </div>
             </div>
@@ -369,6 +371,60 @@ export const MainMenu: React.FC<MainMenuProps> = ({ onSelectGame, starsCount }) 
             <div className="hidden sm:flex items-center gap-1 z-10 text-2xl animate-bounce-short">
               <span>🚓</span>
               <span>🚒</span>
+            </div>
+          </button>
+
+          {/* せんろをつくろう */}
+          <button
+            onClick={() => handleGameSelect('traintrack', 'せんろをつくろう')}
+            className="kid-btn rounded-3xl p-4 bg-gradient-to-r from-blue-400 via-sky-400 to-teal-400 border-4 border-blue-500 shadow-xl flex items-center justify-between overflow-hidden group hover:scale-[1.01] hover:shadow-2xl transition-all relative"
+          >
+            <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/20 rounded-full blur-sm pointer-events-none" />
+            <div className="flex items-center gap-3 z-10">
+              <div className="w-14 h-14 rounded-2xl bg-white/95 shadow-md flex items-center justify-center border-2 border-white/60 group-hover:rotate-12 transition-transform text-3xl">
+                🚄
+              </div>
+              <div className="text-left">
+                <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-black mb-1 bg-white/90 text-blue-900 shadow-sm">
+                  ★ せんろを ひこう ★
+                </span>
+                <h2 className="text-xl sm:text-2xl font-black text-white drop-shadow-sm leading-tight">
+                  せんろをつくろう
+                </h2>
+                <p className="text-white/90 font-bold text-xs drop-shadow">
+                  指でせんろをかいて 新幹線を 走らせよう！
+                </p>
+              </div>
+            </div>
+            <div className="hidden sm:flex items-center gap-1 z-10 text-2xl animate-bounce-short">
+              <span>🚂</span>
+            </div>
+          </button>
+
+          {/* わくわくホッケー */}
+          <button
+            onClick={() => handleGameSelect('hockey', 'わくわくホッケー')}
+            className="kid-btn rounded-3xl p-4 bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 border-4 border-orange-500 shadow-xl flex items-center justify-between overflow-hidden group hover:scale-[1.01] hover:shadow-2xl transition-all relative"
+          >
+            <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/20 rounded-full blur-sm pointer-events-none" />
+            <div className="flex items-center gap-3 z-10">
+              <div className="w-14 h-14 rounded-2xl bg-white/95 shadow-md flex items-center justify-center border-2 border-white/60 group-hover:rotate-12 transition-transform text-3xl">
+                🏑
+              </div>
+              <div className="text-left">
+                <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-black mb-1 bg-white/90 text-orange-900 shadow-sm">
+                  ★ たいせんスポーツ ★
+                </span>
+                <h2 className="text-xl sm:text-2xl font-black text-white drop-shadow-sm leading-tight">
+                  わくわくホッケー
+                </h2>
+                <p className="text-white/90 font-bold text-xs drop-shadow">
+                  くまさんと パックを はじいて 対戦しよう！
+                </p>
+              </div>
+            </div>
+            <div className="hidden sm:flex items-center gap-1 z-10 text-2xl animate-bounce-short">
+              <span>🐻</span>
             </div>
           </button>
         </div>

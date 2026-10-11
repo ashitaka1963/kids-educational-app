@@ -34,7 +34,37 @@ const PEN_SIZES = [
   { label: 'ふとい', size: 28 },
 ];
 
-const STAMPS = ['⭐', '💖', '🌸', '🚗', '🐶'];
+export interface StampOption {
+  char: string;
+  name: string;
+}
+
+export const STAMPS: StampOption[] = [
+  { char: '⭐', name: 'ほし' },
+  { char: '💖', name: 'ハート' },
+  { char: '🌸', name: 'おはな' },
+  { char: '🌈', name: 'にじ' },
+  { char: '👑', name: 'おうかん' },
+  { char: '🎉', name: 'クラッカー' },
+  { char: '🐶', name: 'いぬ' },
+  { char: '🐱', name: 'ねこ' },
+  { char: '🐰', name: 'うさぎ' },
+  { char: '🐻', name: 'くま' },
+  { char: '🐼', name: 'パンダ' },
+  { char: '🦁', name: 'ライオン' },
+  { char: '🦖', name: 'きょうりゅう' },
+  { char: '🚗', name: 'くるま' },
+  { char: '🚓', name: 'パトカー' },
+  { char: '🚒', name: 'しょうぼうしゃ' },
+  { char: '🚄', name: 'しんかんせん' },
+  { char: '🚀', name: 'ロケット' },
+  { char: '🍎', name: 'りんご' },
+  { char: '🍓', name: 'いちご' },
+  { char: '🍌', name: 'バナナ' },
+  { char: '🍦', name: 'アイス' },
+  { char: '🍩', name: 'ドーナツ' },
+  { char: '🍰', name: 'ケーキ' },
+];
 
 export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ onHome, starsCount }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -42,7 +72,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ onHome, starsCount
   const [currentColor, setCurrentColor] = useState<string>(COLORS[0].hex);
   const [currentSize, setCurrentSize] = useState<number>(PEN_SIZES[1].size);
   const [toolMode, setToolMode] = useState<ToolMode>('pen');
-  const [currentStamp, setCurrentStamp] = useState<string>(STAMPS[0]);
+  const [currentStamp, setCurrentStamp] = useState<string>(STAMPS[0].char);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [history, setHistory] = useState<ImageData[]>([]);
 
@@ -176,11 +206,11 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ onHome, starsCount
     speechManager.speak(label);
   };
 
-  const handleSelectStamp = (stamp: string) => {
+  const handleSelectStamp = (stamp: StampOption) => {
     soundManager.playTap();
-    setCurrentStamp(stamp);
+    setCurrentStamp(stamp.char);
     setToolMode('stamp');
-    speechManager.speak('スタンプ！');
+    speechManager.speak(`${stamp.name}スタンプ！`);
   };
 
   const handleClearCanvas = () => {
@@ -276,23 +306,26 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ onHome, starsCount
 
           {/* ポンポンスタンプ */}
           <div className="flex flex-col">
-            <span className="text-xs sm:text-sm font-black text-amber-950 mb-1.5 hidden md:block">
-              ✨ スタンプ
-            </span>
-            <div className="flex gap-1.5 justify-around">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs sm:text-sm font-black text-amber-950">
+                ✨ スタンプ（全24しゅるい）
+              </span>
+            </div>
+            <div className="grid grid-cols-4 md:grid-cols-4 gap-1.5 max-h-36 sm:max-h-44 overflow-y-auto p-1 bg-amber-50/80 rounded-2xl border-2 border-amber-200">
               {STAMPS.map((stamp) => {
-                const isSelected = toolMode === 'stamp' && currentStamp === stamp;
+                const isSelected = toolMode === 'stamp' && currentStamp === stamp.char;
                 return (
                   <button
-                    key={stamp}
+                    key={stamp.char}
                     onClick={() => handleSelectStamp(stamp)}
-                    className={`kid-btn w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center text-xl shadow-sm border-2 ${
+                    className={`kid-btn h-10 w-10 sm:h-11 sm:w-11 rounded-2xl flex items-center justify-center text-xl sm:text-2xl shadow-sm border-2 transition-transform ${
                       isSelected
-                        ? 'bg-yellow-200 border-yellow-500 scale-110 ring-2 ring-yellow-400'
-                        : 'bg-white border-amber-200'
+                        ? 'bg-yellow-200 border-yellow-500 scale-110 ring-2 ring-yellow-400 z-10'
+                        : 'bg-white border-amber-200 hover:bg-amber-100'
                     }`}
+                    title={stamp.name}
                   >
-                    {stamp}
+                    {stamp.char}
                   </button>
                 );
               })}
