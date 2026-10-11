@@ -14,6 +14,7 @@ const ROWS = 7;
 const CELL_SIZE = 100;
 const STAGE_WIDTH = COLS * CELL_SIZE;   // 1000
 const STAGE_HEIGHT = ROWS * CELL_SIZE; // 700
+const MAX_TRAINS = 5;
 
 // セルの接続方向
 type Dir = 'N' | 'S' | 'E' | 'W';
@@ -24,12 +25,16 @@ interface Cell {
   switchExit?: Dir; // 分岐セルでの優先進行方向
 }
 
-// 電車の座標（進行方向）
-interface TrainPos {
+// 電車の状態
+interface ActiveTrain {
+  id: string;
+  typeIndex: number;  // TRAINSのインデックス (0〜4)
   cellIndex: number;  // 現在いるセル
-  progress: number;   // セル内の進捗 0〜1
   enterDir: Dir;      // どの辺から入ってきたか
   exitDir: Dir;       // どの辺へ抜けるか
+  progress: number;   // 0〜1
+  speedScale: number; // 速度の微細な個性
+  isJumping?: boolean; // タッチされた時のアクション
 }
 
 const opposite: Record<Dir, Dir> = { N: 'S', S: 'N', E: 'W', W: 'E' };
@@ -45,9 +50,9 @@ const dirAngle: Record<Dir, number> = {
   E: 0, S: 90, W: 180, N: 270,
 };
 
-// 電車の種類（モノレール追加！）
+// 電車の種類（モノレール含む5車種）
 const TRAINS = [
-  { id: 'monorail', emoji: '🚝', label: 'モノレール', desc: 'くうちゅうを はしるよ', color: '#0284c7', bodyColor: '#ffffff', stripeColor: '#0ea5e9', isMonorail: true },
+  { id: 'monorail', emoji: '🚝', label: 'モノレール', desc: 'くうちゅうを はしるよ', color: '#0284c7', bodyColor: '#ffffff', stripeColor: '#0ea5e9' },
   { id: 'shinkansen', emoji: '🚄', label: 'しんかんせん', desc: 'はやぶさ風', color: '#0284c7', bodyColor: '#f0f9ff', stripeColor: '#0284c7' },
   { id: 'yellow', emoji: '🟡', label: 'ドクターイエロー', desc: 'しあわせのきいろ', color: '#ca8a04', bodyColor: '#fefce8', stripeColor: '#ca8a04' },
   { id: 'local', emoji: '🚃', label: 'でんしゃ', desc: 'みどりのやまのてせん', color: '#16a34a', bodyColor: '#f0fdf4', stripeColor: '#16a34a' },
@@ -112,7 +117,7 @@ function getRailPath(connections: CellConnections, cx: number, cy: number, size:
     }
   }
 
-  // 3方向以上（分岐ポイントや十字交差）：中心から各辺へ接続
+  // 3方向以上（分岐・交差）：中心から各辺へ接続
   return dirs.map((d) => {
     const e = getEnd(d);
     return `M${cx},${cy} L${e.x},${e.y}`;
@@ -121,17 +126,17 @@ function getRailPath(connections: CellConnections, cx: number, cy: number, size:
 
 // 電車の仮想ピクセル座標を計算
 function getTrainPixelPos(
-  trainPos: TrainPos,
+  train: ActiveTrain,
   cellSize: number
 ): { x: number; y: number; angle: number } {
-  const { col, row } = cellColRow(trainPos.cellIndex);
+  const { col, row } = cellColRow(train.cellIndex);
   const cx = col * cellSize + cellSize / 2;
   const cy = row * cellSize + cellSize / 2;
   const half = cellSize / 2;
-  const p = Math.max(0, Math.min(1, trainPos.progress));
+  const p = Math.max(0, Math.min(1, train.progress));
 
-  const enter = trainPos.enterDir;
-  const exit = trainPos.exitDir;
+  const enter = train.enterDir;
+  const exit = train.exitDir;
 
   const getEdge = (d: Dir) => ({
     x: cx + (d === 'E' ? half : d === 'W' ? -half : 0),
@@ -144,17 +149,14 @@ function getTrainPixelPos(
   let x: number, y: number, angle: number;
   if ((enter === 'W' && exit === 'E') || (enter === 'E' && exit === 'W') ||
       (enter === 'N' && exit === 'S') || (enter === 'S' && exit === 'N')) {
-    // 直線補間：入り口から出口へ一直線
     x = entryEdge.x + (exitEdge.x - entryEdge.x) * p;
     y = entryEdge.y + (exitEdge.y - entryEdge.y) * p;
     angle = dirAngle[exit];
   } else if (enter === exit) {
-    // 折り返し（同じ辺から戻る場合）
     x = entryEdge.x;
     y = entryEdge.y;
     angle = dirAngle[exit];
   } else {
-    // カーブ補間（2次ベジェ曲線）
     const t = p;
     x = (1 - t) * (1 - t) * entryEdge.x + 2 * (1 - t) * t * cx + t * t * exitEdge.x;
     y = (1 - t) * (1 - t) * entryEdge.y + 2 * (1 - t) * t * cy + t * t * exitEdge.y;
@@ -170,10 +172,9 @@ export const TrainTrackGame: React.FC<TrainTrackGameProps> = ({ onHome, starsCou
   const [cells, setCells] = useState<Cell[]>(() =>
     Array.from({ length: COLS * ROWS }, () => ({ connections: new Set<Dir>() }))
   );
-  const [selectedTrain, setSelectedTrain] = useState(0);
+  const [activeTrains, setActiveTrains] = useState<ActiveTrain[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [speed, setSpeed] = useState(1);
-  const [trainPos, setTrainPos] = useState<TrainPos | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [lastCell, setLastCell] = useState<number | null>(null);
   const [statusMsg, setStatusMsg] = useState('指でなぞって 線路をかこう！');
@@ -181,166 +182,186 @@ export const TrainTrackGame: React.FC<TrainTrackGameProps> = ({ onHome, starsCou
   const gridRef = useRef<SVGSVGElement>(null);
   const animFrameRef = useRef<number>(0);
   const cellsRef = useRef<Cell[]>(cells);
-  const trainPosRef = useRef<TrainPos | null>(null);
+  const activeTrainsRef = useRef<ActiveTrain[]>(activeTrains);
   const isRunningRef = useRef(false);
   const speedRef = useRef(speed);
 
   useEffect(() => { cellsRef.current = cells; }, [cells]);
-  useEffect(() => { trainPosRef.current = trainPos; }, [trainPos]);
+  useEffect(() => { activeTrainsRef.current = activeTrains; }, [activeTrains]);
   useEffect(() => { isRunningRef.current = isRunning; }, [isRunning]);
   useEffect(() => { speedRef.current = speed; }, [speed]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      speechManager.speak('せんろをかいて でんしゃを はしらせよう！');
+      speechManager.speak('せんろをかいて でんしゃを えらんでね！さいだい5だい はしるよ！');
     }, 400);
     return () => clearTimeout(timer);
   }, []);
 
-  // 電車の走行アニメーションループ
+  // 複数電車の走行アニメーションループ
   const animate = useCallback(() => {
     if (!isRunningRef.current) return;
 
     const currentCells = cellsRef.current;
-    const tp = trainPosRef.current;
+    const currentTrains = activeTrainsRef.current;
 
-    if (!tp) {
-      cancelAnimationFrame(animFrameRef.current);
+    if (currentTrains.length === 0) {
+      animFrameRef.current = requestAnimationFrame(animate);
       return;
     }
 
-    const speedFactor = speedRef.current * 0.022;
-    const newProgress = tp.progress + speedFactor;
+    const baseSpeed = speedRef.current * 0.022;
 
-    if (newProgress >= 1) {
-      // 現在のセルから exitDir 方向へ抜ける
-      const { col, row } = cellColRow(tp.cellIndex);
-      const offset = dirOffset[tp.exitDir];
-      const nc = col + offset.dc;
-      const nr = row + offset.dr;
+    const nextTrains = currentTrains.map((tp) => {
+      const speedFactor = baseSpeed * tp.speedScale;
+      const newProgress = tp.progress + speedFactor;
 
-      // 次のセルがグリッド内か確認
-      if (nc >= 0 && nc < COLS && nr >= 0 && nr < ROWS) {
-        const nextIdx = cellIdx(nc, nr);
-        const nextCell = currentCells[nextIdx];
-        const nextEnterDir = opposite[tp.exitDir]; // 次のセルにとっての入口
+      if (newProgress >= 1) {
+        // 現在のセルから exitDir 方向へ抜ける
+        const { col, row } = cellColRow(tp.cellIndex);
+        const offset = dirOffset[tp.exitDir];
+        const nc = col + offset.dc;
+        const nr = row + offset.dr;
 
-        // 次のセルが線路を持っており、かつ入口が開いているか確認
-        if (nextCell.connections.has(nextEnterDir)) {
-          // 次のセルの出口を探す（入ってきた方向以外の接続）
-          const candidateExits = Array.from(nextCell.connections).filter(d => d !== nextEnterDir);
+        if (nc >= 0 && nc < COLS && nr >= 0 && nr < ROWS) {
+          const nextIdx = cellIdx(nc, nr);
+          const nextCell = currentCells[nextIdx];
+          const nextEnterDir = opposite[tp.exitDir];
 
-          let nextExitDir: Dir;
-          if (candidateExits.length > 1) {
-            // 分岐！優先方向が設定されていればそれを採用
-            if (nextCell.switchExit && candidateExits.includes(nextCell.switchExit)) {
-              nextExitDir = nextCell.switchExit;
-            } else {
-              // 直進方向を優先し、なければ先頭
-              const straightDir = opposite[nextEnterDir];
-              if (candidateExits.includes(straightDir)) {
-                nextExitDir = straightDir;
+          if (nextCell.connections.has(nextEnterDir)) {
+            const candidateExits = Array.from(nextCell.connections).filter(d => d !== nextEnterDir);
+
+            let nextExitDir: Dir;
+            if (candidateExits.length > 1) {
+              // 分岐！優先出口があれば採用
+              if (nextCell.switchExit && candidateExits.includes(nextCell.switchExit)) {
+                nextExitDir = nextCell.switchExit;
               } else {
-                nextExitDir = candidateExits[0];
+                const straightDir = opposite[nextEnterDir];
+                if (candidateExits.includes(straightDir)) {
+                  nextExitDir = straightDir;
+                } else {
+                  nextExitDir = candidateExits[0];
+                }
               }
+            } else if (candidateExits.length === 1) {
+              nextExitDir = candidateExits[0];
+            } else {
+              nextExitDir = nextEnterDir;
             }
-          } else if (candidateExits.length === 1) {
-            nextExitDir = candidateExits[0];
-          } else {
-            // 行き止まりセル（出口がないので折り返し）
-            nextExitDir = nextEnterDir;
+
+            return {
+              ...tp,
+              cellIndex: nextIdx,
+              enterDir: nextEnterDir,
+              exitDir: nextExitDir,
+              progress: newProgress - 1,
+            };
           }
-
-          const newTp: TrainPos = {
-            cellIndex: nextIdx,
-            enterDir: nextEnterDir,
-            exitDir: nextExitDir,
-            progress: newProgress - 1,
-          };
-          trainPosRef.current = newTp;
-          setTrainPos(newTp);
-          animFrameRef.current = requestAnimationFrame(animate);
-          return;
         }
+
+        // 行き止まり（終点）でのUターン
+        const currentCell = currentCells[tp.cellIndex];
+        if (currentCell.connections.has(tp.enterDir)) {
+          return {
+            ...tp,
+            enterDir: tp.exitDir,
+            exitDir: tp.enterDir,
+            progress: 0,
+          };
+        }
+        return tp;
       }
 
-      // 次のセルがない、または線路がつながっていない場合：終点（行き止まり）で折り返し（Uターン）
-      const currentCell = currentCells[tp.cellIndex];
-      if (currentCell.connections.has(tp.enterDir)) {
-        const newTp: TrainPos = {
-          cellIndex: tp.cellIndex,
-          enterDir: tp.exitDir,
-          exitDir: tp.enterDir,
-          progress: 0,
-        };
-        trainPosRef.current = newTp;
-        setTrainPos(newTp);
-      } else {
-        setIsRunning(false);
-        isRunningRef.current = false;
-        setStatusMsg('ゆきどまり！せんろを のばしてね');
-        speechManager.speak('ゆきどまりだよ！せんろを のばしてね');
-        return;
-      }
-    } else {
-      const newTp = { ...tp, progress: newProgress };
-      trainPosRef.current = newTp;
-      setTrainPos(newTp);
-    }
+      return { ...tp, progress: newProgress };
+    });
+
+    activeTrainsRef.current = nextTrains;
+    setActiveTrains(nextTrains);
 
     animFrameRef.current = requestAnimationFrame(animate);
   }, []);
 
+  // 電車を追加する（最大5台）
+  const handleAddTrain = (typeIndex: number) => {
+    soundManager.playTap();
+    const trainInfo = TRAINS[typeIndex];
+
+    const currentCells = cellsRef.current;
+    const trackCellIndices: number[] = [];
+    currentCells.forEach((c, idx) => {
+      if (c.connections.size > 0) trackCellIndices.push(idx);
+    });
+
+    if (trackCellIndices.length === 0) {
+      setStatusMsg('まず ゆびで せんろを かいてね！');
+      speechManager.speak('まず ゆびで せんろを かいてね！');
+      soundManager.playTryAgain();
+      return;
+    }
+
+    if (activeTrains.length >= MAX_TRAINS) {
+      setStatusMsg('でんしゃが いっぱいだよ！（さいだい5だい）');
+      speechManager.speak('でんしゃが いっぱいだよ！さいだい5だいまでだよ！');
+      soundManager.playTryAgain();
+      return;
+    }
+
+    // 既に他の電車がいるセルを避けて配置
+    const occupiedCells = new Set(activeTrains.map(t => t.cellIndex));
+    const availableCells = trackCellIndices.filter(idx => !occupiedCells.has(idx));
+    const targetCellIdx = availableCells.length > 0
+      ? availableCells[Math.floor(Math.random() * availableCells.length)]
+      : trackCellIndices[Math.floor(Math.random() * trackCellIndices.length)];
+
+    const cell = currentCells[targetCellIdx];
+    const dirs = Array.from(cell.connections);
+    let enterDir: Dir;
+    let exitDir: Dir;
+
+    if (dirs.length === 1) {
+      exitDir = dirs[0];
+      enterDir = opposite[exitDir];
+    } else {
+      enterDir = dirs[0];
+      exitDir = dirs[1];
+    }
+
+    const newTrain: ActiveTrain = {
+      id: `${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      typeIndex,
+      cellIndex: targetCellIdx,
+      enterDir,
+      exitDir,
+      progress: 0,
+      speedScale: 0.96 + Math.random() * 0.08,
+      isJumping: false,
+    };
+
+    const nextList = [...activeTrains, newTrain];
+    setActiveTrains(nextList);
+    activeTrainsRef.current = nextList;
+
+    soundManager.playWhistle();
+    speechManager.speak(`${trainInfo.label} しゅっぱつ！`);
+    setStatusMsg(`${trainInfo.label}が 出発したよ！（${nextList.length}/${MAX_TRAINS}だい）🚄`);
+
+    // 自動で走らせる
+    if (!isRunning) {
+      setIsRunning(true);
+      isRunningRef.current = true;
+      animFrameRef.current = requestAnimationFrame(animate);
+    }
+  };
+
   // GO / STOP 切り替え
   const toggleRun = () => {
     if (!isRunning) {
-      const currentCells = cellsRef.current;
-      // 端点（接続が1つのセル）を優先して始点にする
-      let startIdx = -1;
-      for (let i = 0; i < currentCells.length; i++) {
-        if (currentCells[i].connections.size === 1) {
-          startIdx = i;
-          break;
-        }
-      }
-      if (startIdx === -1) {
-        // ループ線路など端点がない場合は、線路がある最初のセル
-        for (let i = 0; i < currentCells.length; i++) {
-          if (currentCells[i].connections.size > 0) {
-            startIdx = i;
-            break;
-          }
-        }
-      }
-
-      if (startIdx === -1) {
-        setStatusMsg('まず せんろを かいてね！');
-        speechManager.speak('まず せんろを かいてね！');
-        soundManager.playTryAgain();
+      if (activeTrains.length === 0) {
+        setStatusMsg('右のでんしゃを 選んで 線路に出してね！');
+        speechManager.speak('すきな でんしゃを えらんでね！');
         return;
       }
-
-      const startCell = currentCells[startIdx];
-      const dirs = Array.from(startCell.connections);
-      let enterDir: Dir;
-      let exitDir: Dir;
-
-      if (dirs.length === 1) {
-        exitDir = dirs[0];
-        enterDir = opposite[exitDir];
-      } else {
-        enterDir = dirs[0];
-        exitDir = dirs[1];
-      }
-
-      const tp: TrainPos = {
-        cellIndex: startIdx,
-        enterDir,
-        exitDir,
-        progress: 0,
-      };
-      trainPosRef.current = tp;
-      setTrainPos(tp);
       setIsRunning(true);
       isRunningRef.current = true;
       soundManager.playWhistle();
@@ -354,6 +375,20 @@ export const TrainTrackGame: React.FC<TrainTrackGameProps> = ({ onHome, starsCou
       setStatusMsg('ていしゃしました！');
       speechManager.speak('ていしゃ！');
     }
+  };
+
+  // 電車をタップした時のホップ＆汽笛
+  const handleTapTrain = (trainId: string, e: React.MouseEvent | React.PointerEvent) => {
+    e.stopPropagation();
+    soundManager.playWhistle();
+    setActiveTrains(prev =>
+      prev.map(t => (t.id === trainId ? { ...t, isJumping: true } : t))
+    );
+    setTimeout(() => {
+      setActiveTrains(prev =>
+        prev.map(t => (t.id === trainId ? { ...t, isJumping: false } : t))
+      );
+    }, 450);
   };
 
   // 分岐ポイントの切り替え
@@ -387,13 +422,13 @@ export const TrainTrackGame: React.FC<TrainTrackGameProps> = ({ onHome, starsCou
 
   // ガタンゴトン音
   useEffect(() => {
-    if (isRunning) {
+    if (isRunning && activeTrains.length > 0) {
       const interval = setInterval(() => {
         if (isRunningRef.current) soundManager.playTrainRoll();
       }, 550 / speed);
       return () => clearInterval(interval);
     }
-  }, [isRunning, speed]);
+  }, [isRunning, speed, activeTrains.length]);
 
   // タッチ座標を仮想ステージ座標（1000×700）へ変換
   const getCellFromEvent = useCallback((e: React.PointerEvent<SVGSVGElement>): number | null => {
@@ -444,7 +479,7 @@ export const TrainTrackGame: React.FC<TrainTrackGameProps> = ({ onHome, starsCou
     setLastCell(null);
   }, []);
 
-  // 線路を全消し
+  // 線路と電車を全消し
   const clearTracks = () => {
     if (isRunning) {
       setIsRunning(false);
@@ -454,23 +489,13 @@ export const TrainTrackGame: React.FC<TrainTrackGameProps> = ({ onHome, starsCou
     const newCells: Cell[] = Array.from({ length: COLS * ROWS }, () => ({ connections: new Set<Dir>() }));
     setCells(newCells);
     cellsRef.current = newCells;
-    setTrainPos(null);
-    trainPosRef.current = null;
+    setActiveTrains([]);
+    activeTrainsRef.current = [];
     setStatusMsg('指でなぞって 線路をかこう！');
-    speechManager.speak('せんろを ぜんぶけしたよ！また かいてね！');
+    speechManager.speak('せんろと でんしゃを ぜんぶけしたよ！');
     soundManager.playTap();
   };
 
-  // 電車の描画座標
-  let trainScreenX = -999, trainScreenY = -999, trainAngle = 0;
-  if (trainPos) {
-    const pos = getTrainPixelPos(trainPos, CELL_SIZE);
-    trainScreenX = pos.x;
-    trainScreenY = pos.y;
-    trainAngle = pos.angle;
-  }
-
-  const train = TRAINS[selectedTrain];
   const hasTrack = cells.some(c => c.connections.size > 0);
 
   return (
@@ -523,7 +548,7 @@ export const TrainTrackGame: React.FC<TrainTrackGameProps> = ({ onHome, starsCou
               <span className="text-3xl">🏪</span>
             </div>
 
-            {/* 線路描画SVG（親コンテナいっぱいに広がるレスポンシブSVG） */}
+            {/* 線路描画SVG */}
             <svg
               ref={gridRef}
               viewBox={`0 0 ${STAGE_WIDTH} ${STAGE_HEIGHT}`}
@@ -610,145 +635,199 @@ export const TrainTrackGame: React.FC<TrainTrackGameProps> = ({ onHome, starsCou
                       strokeDasharray={`${CELL_SIZE * 0.22},${CELL_SIZE * 0.12}`}
                     />
 
-                    {/* 分岐切り替えスイッチ（3方向以上ある場合） */}
-                    {cell.connections.size >= 3 && (
-                      <g
-                        className="cursor-pointer"
-                        onPointerDown={(e) => handleToggleSwitch(idx, e)}
-                        style={{ pointerEvents: 'auto' }}
-                      >
-                        {/* 外側の光るリング */}
-                        <circle
-                          cx={cx}
-                          cy={cy}
-                          r={CELL_SIZE * 0.22}
-                          fill="#fef08a"
-                          stroke="#eab308"
-                          strokeWidth="3.5"
-                          filter="drop-shadow(0 2px 4px rgba(0,0,0,0.2))"
-                        />
-                        {/* 矢印アイコン */}
-                        <text
-                          x={cx}
-                          y={cy + 6}
-                          textAnchor="middle"
-                          fontSize={CELL_SIZE * 0.24}
-                          className="select-none pointer-events-none"
-                        >
-                          🔀
-                        </text>
-                      </g>
-                    )}
+                    {/* 分岐切り替えスイッチ（3方向以上ある場合：開通方向を視覚的に明示） */}
+                    {cell.connections.size >= 3 && (() => {
+                      const activeDir = cell.switchExit || Array.from(cell.connections)[0];
+                      const half = CELL_SIZE / 2;
+                      const arrowEndX = cx + (activeDir === 'E' ? half * 0.85 : activeDir === 'W' ? -half * 0.85 : 0);
+                      const arrowEndY = cy + (activeDir === 'S' ? half * 0.85 : activeDir === 'N' ? -half * 0.85 : 0);
+
+                      return (
+                        <g key={`switch_${idx}`}>
+                          {/* 1. 現在開通している方向の光るグリーンレール（太いハイライト） */}
+                          <line
+                            x1={cx}
+                            y1={cy}
+                            x2={arrowEndX}
+                            y2={arrowEndY}
+                            stroke="#22c55e"
+                            strokeWidth={CELL_SIZE * 0.14}
+                            strokeLinecap="round"
+                            opacity="0.85"
+                            className="animate-pulse"
+                          />
+                          <line
+                            x1={cx}
+                            y1={cy}
+                            x2={arrowEndX}
+                            y2={arrowEndY}
+                            stroke="#86efac"
+                            strokeWidth={CELL_SIZE * 0.06}
+                            strokeLinecap="round"
+                          />
+
+                          {/* 2. タップできるポイント切り替え矢印ボタン */}
+                          <g
+                            className="cursor-pointer transition-transform hover:scale-110 active:scale-95"
+                            onPointerDown={(e) => handleToggleSwitch(idx, e)}
+                            style={{ pointerEvents: 'auto' }}
+                          >
+                            {/* 黄色い光る円盤 */}
+                            <circle
+                              cx={cx}
+                              cy={cy}
+                              r={CELL_SIZE * 0.24}
+                              fill="#fef08a"
+                              stroke="#ca8a04"
+                              strokeWidth="4"
+                              filter="drop-shadow(0 3px 6px rgba(0,0,0,0.3))"
+                            />
+
+                            {/* 開通方向を指す大きなグリーン矢印（回転） */}
+                            <g transform={`translate(${cx}, ${cy}) rotate(${dirAngle[activeDir]})`}>
+                              {/* 矢印の軸 */}
+                              <line
+                                x1={-CELL_SIZE * 0.12}
+                                y1={0}
+                                x2={CELL_SIZE * 0.08}
+                                y2={0}
+                                stroke="#15803d"
+                                strokeWidth={CELL_SIZE * 0.08}
+                                strokeLinecap="round"
+                              />
+                              {/* 矢印の頭部 */}
+                              <polygon
+                                points={`${CELL_SIZE * 0.05},${-CELL_SIZE * 0.12} ${CELL_SIZE * 0.19},0 ${CELL_SIZE * 0.05},${CELL_SIZE * 0.12}`}
+                                fill="#15803d"
+                              />
+                            </g>
+                          </g>
+                        </g>
+                      );
+                    })()}
                   </g>
                 );
               })}
 
-              {/* 走行中の電車（SVGパーツ） */}
-              {trainPos && (
-                <g transform={`translate(${trainScreenX}, ${trainScreenY}) rotate(${trainAngle})`}>
-                  {/* 電車の影 */}
-                  <rect
-                    x={-CELL_SIZE * 0.44}
-                    y={-CELL_SIZE * 0.18}
-                    width={CELL_SIZE * 0.88}
-                    height={CELL_SIZE * 0.44}
-                    rx={CELL_SIZE * 0.12}
-                    fill="black"
-                    opacity="0.25"
-                  />
+              {/* --- 走行中の電車たち（最大5台） --- */}
+              {activeTrains.map((trainItem) => {
+                const train = TRAINS[trainItem.typeIndex];
+                const { x, y, angle } = getTrainPixelPos(trainItem, CELL_SIZE);
 
-                  {train.id === 'monorail' ? (
-                    /* モノレール車体（流線型の近未来ボディ） */
-                    <>
-                      <rect
-                        x={-CELL_SIZE * 0.44}
-                        y={-CELL_SIZE * 0.24}
-                        width={CELL_SIZE * 0.88}
-                        height={CELL_SIZE * 0.48}
-                        rx={CELL_SIZE * 0.16}
-                        fill="#ffffff"
-                        stroke="#0284c7"
-                        strokeWidth={CELL_SIZE * 0.05}
-                      />
-                      <rect
-                        x={-CELL_SIZE * 0.44}
-                        y={-CELL_SIZE * 0.04}
-                        width={CELL_SIZE * 0.88}
-                        height={CELL_SIZE * 0.12}
-                        fill="#0ea5e9"
-                      />
-                      <ellipse
-                        cx={CELL_SIZE * 0.4}
-                        cy={0}
-                        rx={CELL_SIZE * 0.1}
-                        ry={CELL_SIZE * 0.18}
-                        fill="#0284c7"
-                      />
-                      <rect
-                        x={-CELL_SIZE * 0.32}
-                        y={-CELL_SIZE * 0.18}
-                        width={CELL_SIZE * 0.52}
-                        height={CELL_SIZE * 0.12}
-                        rx={CELL_SIZE * 0.03}
-                        fill="#bae6fd"
-                        stroke="#0284c7"
-                        strokeWidth={1.5}
-                      />
-                    </>
-                  ) : (
-                    /* 通常の新幹線・でんしゃ・SL */
-                    <>
-                      <rect
-                        x={-CELL_SIZE * 0.42}
-                        y={-CELL_SIZE * 0.22}
-                        width={CELL_SIZE * 0.84}
-                        height={CELL_SIZE * 0.44}
-                        rx={CELL_SIZE * 0.12}
-                        fill={train.bodyColor}
-                        stroke={train.color}
-                        strokeWidth={CELL_SIZE * 0.05}
-                      />
-                      <rect
-                        x={-CELL_SIZE * 0.42}
-                        y={-CELL_SIZE * 0.06}
-                        width={CELL_SIZE * 0.84}
-                        height={CELL_SIZE * 0.14}
-                        fill={train.stripeColor}
-                      />
-                      <ellipse
-                        cx={CELL_SIZE * 0.42}
-                        cy={0}
-                        rx={CELL_SIZE * 0.12}
-                        ry={CELL_SIZE * 0.2}
-                        fill={train.color}
-                      />
-                      <rect
-                        x={-CELL_SIZE * 0.3}
-                        y={-CELL_SIZE * 0.16}
-                        width={CELL_SIZE * 0.2}
-                        height={CELL_SIZE * 0.14}
-                        rx={CELL_SIZE * 0.04}
-                        fill="#7dd3fc"
-                        stroke="#0284c7"
-                        strokeWidth={1.5}
-                      />
-                      <rect
-                        x={-CELL_SIZE * 0.04}
-                        y={-CELL_SIZE * 0.16}
-                        width={CELL_SIZE * 0.2}
-                        height={CELL_SIZE * 0.14}
-                        rx={CELL_SIZE * 0.04}
-                        fill="#7dd3fc"
-                        stroke="#0284c7"
-                        strokeWidth={1.5}
-                      />
-                    </>
-                  )}
-                </g>
-              )}
+                return (
+                  <g
+                    key={trainItem.id}
+                    transform={`translate(${x}, ${y}) rotate(${angle})`}
+                    className="cursor-pointer pointer-events-auto select-none"
+                    onPointerDown={(e) => handleTapTrain(trainItem.id, e)}
+                  >
+                    {/* 電車の影 */}
+                    <rect
+                      x={-CELL_SIZE * 0.44}
+                      y={-CELL_SIZE * 0.18}
+                      width={CELL_SIZE * 0.88}
+                      height={CELL_SIZE * 0.44}
+                      rx={CELL_SIZE * 0.12}
+                      fill="black"
+                      opacity="0.25"
+                    />
+
+                    {/* タッチ時のホップ（ジャンプ） */}
+                    <g transform={trainItem.isJumping ? 'scale(1.2) translate(0, -10)' : undefined}>
+                      {train.id === 'monorail' ? (
+                        /* モノレール車体（流線型） */
+                        <>
+                          <rect
+                            x={-CELL_SIZE * 0.44}
+                            y={-CELL_SIZE * 0.24}
+                            width={CELL_SIZE * 0.88}
+                            height={CELL_SIZE * 0.48}
+                            rx={CELL_SIZE * 0.16}
+                            fill="#ffffff"
+                            stroke="#0284c7"
+                            strokeWidth={CELL_SIZE * 0.05}
+                          />
+                          <rect
+                            x={-CELL_SIZE * 0.44}
+                            y={-CELL_SIZE * 0.04}
+                            width={CELL_SIZE * 0.88}
+                            height={CELL_SIZE * 0.12}
+                            fill="#0ea5e9"
+                          />
+                          <ellipse
+                            cx={CELL_SIZE * 0.4}
+                            cy={0}
+                            rx={CELL_SIZE * 0.1}
+                            ry={CELL_SIZE * 0.18}
+                            fill="#0284c7"
+                          />
+                          <rect
+                            x={-CELL_SIZE * 0.32}
+                            y={-CELL_SIZE * 0.18}
+                            width={CELL_SIZE * 0.52}
+                            height={CELL_SIZE * 0.12}
+                            rx={CELL_SIZE * 0.03}
+                            fill="#bae6fd"
+                            stroke="#0284c7"
+                            strokeWidth={1.5}
+                          />
+                        </>
+                      ) : (
+                        /* 通常の新幹線・でんしゃ・SL */
+                        <>
+                          <rect
+                            x={-CELL_SIZE * 0.42}
+                            y={-CELL_SIZE * 0.22}
+                            width={CELL_SIZE * 0.84}
+                            height={CELL_SIZE * 0.44}
+                            rx={CELL_SIZE * 0.12}
+                            fill={train.bodyColor}
+                            stroke={train.color}
+                            strokeWidth={CELL_SIZE * 0.05}
+                          />
+                          <rect
+                            x={-CELL_SIZE * 0.42}
+                            y={-CELL_SIZE * 0.06}
+                            width={CELL_SIZE * 0.84}
+                            height={CELL_SIZE * 0.14}
+                            fill={train.stripeColor}
+                          />
+                          <ellipse
+                            cx={CELL_SIZE * 0.42}
+                            cy={0}
+                            rx={CELL_SIZE * 0.12}
+                            ry={CELL_SIZE * 0.2}
+                            fill={train.color}
+                          />
+                          <rect
+                            x={-CELL_SIZE * 0.3}
+                            y={-CELL_SIZE * 0.16}
+                            width={CELL_SIZE * 0.2}
+                            height={CELL_SIZE * 0.14}
+                            rx={CELL_SIZE * 0.04}
+                            fill="#7dd3fc"
+                            stroke="#0284c7"
+                            strokeWidth={1.5}
+                          />
+                          <rect
+                            x={-CELL_SIZE * 0.04}
+                            y={-CELL_SIZE * 0.16}
+                            width={CELL_SIZE * 0.2}
+                            height={CELL_SIZE * 0.14}
+                            rx={CELL_SIZE * 0.04}
+                            fill="#7dd3fc"
+                            stroke="#0284c7"
+                            strokeWidth={1.5}
+                          />
+                        </>
+                      )}
+                    </g>
+                  </g>
+                );
+              })}
             </svg>
 
-            {/* 線路未敷設時のガイド吹き出し */}
+            {/* ガイド吹き出し */}
             {!hasTrack && (
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-20">
                 <div className="bg-white/95 backdrop-blur px-6 py-4 rounded-3xl border-4 border-emerald-400 shadow-2xl text-center animate-bounce-short">
@@ -757,7 +836,17 @@ export const TrainTrackGame: React.FC<TrainTrackGameProps> = ({ onHome, starsCou
                     ゆびで なぞって せんろを かこう！
                   </span>
                   <span className="text-emerald-700 font-bold text-xs mt-1 block">
-                    つなげたら みぎの「しゅっぱつ！」をおしてね
+                    せんろができたら 右の電車をえらんで 走らせてね！
+                  </span>
+                </div>
+              </div>
+            )}
+            {hasTrack && activeTrains.length === 0 && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-20">
+                <div className="bg-white/95 backdrop-blur px-6 py-3 rounded-3xl border-3 border-emerald-400 shadow-xl text-center animate-bounce-short">
+                  <span className="text-3xl block mb-1">👉</span>
+                  <span className="text-emerald-950 font-black text-base sm:text-lg">
+                    すきな でんしゃを えらんでね！（最大5台）
                   </span>
                 </div>
               </div>
@@ -765,9 +854,9 @@ export const TrainTrackGame: React.FC<TrainTrackGameProps> = ({ onHome, starsCou
           </div>
         </div>
 
-        {/* サイドメニュー：車タウン風のコントローラーパネル */}
+        {/* サイドメニュー：くるまタウン風パネル */}
         <div className="w-full md:w-80 bg-white/95 backdrop-blur-md border-t-2 md:border-t-0 md:border-l-2 border-emerald-200 p-3 sm:p-4 flex flex-row md:flex-col justify-between md:justify-start gap-2.5 sm:gap-3.5 shrink-0 overflow-x-auto md:overflow-y-auto">
-          {/* ヘッダー・ステータス */}
+          {/* ヘッダー・台数表示 */}
           <div className="hidden md:flex items-center justify-between pb-2 border-b border-emerald-100">
             <span className="font-black text-emerald-950 text-base flex items-center gap-1.5">
               <span>🚄</span>
@@ -775,55 +864,48 @@ export const TrainTrackGame: React.FC<TrainTrackGameProps> = ({ onHome, starsCou
             </span>
             <span
               className={`text-xs font-black px-3 py-1 rounded-full border ${
-                isRunning
+                activeTrains.length > 0 && isRunning
                   ? 'bg-green-100 text-green-800 border-green-300 animate-pulse'
                   : 'bg-gray-100 text-gray-700 border-gray-300'
               }`}
             >
-              {isRunning ? 'そうこう中 ⚡' : 'ていしゃ中 🛑'}
+              {activeTrains.length} / {MAX_TRAINS} だい そうこう中
             </span>
           </div>
 
-          {/* 車種選択（モノレール含む5台） */}
+          {/* 車種選択（タップすると追加される！） */}
           <div className="grid grid-cols-5 md:grid-cols-2 gap-1.5 sm:gap-2.5 w-full">
-            {TRAINS.map((t, i) => {
-              const isSelected = selectedTrain === i;
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => {
-                    setSelectedTrain(i);
-                    soundManager.playTap();
-                    speechManager.speak(t.label);
-                  }}
-                  className={`kid-btn p-2 sm:p-2.5 rounded-2xl border-3 flex flex-col items-center justify-center gap-1 transition-all shadow-md ${
-                    isSelected
-                      ? 'bg-blue-100 border-blue-500 scale-105 ring-3 ring-blue-300'
-                      : 'bg-white border-emerald-200 hover:bg-emerald-50'
-                  }`}
-                >
-                  <span className="text-3xl sm:text-4xl">{t.emoji}</span>
-                  <span className="text-xs sm:text-sm font-black text-gray-800 leading-tight">
-                    {t.label}
-                  </span>
-                </button>
-              );
-            })}
+            {TRAINS.map((t, i) => (
+              <button
+                key={t.id}
+                onClick={() => handleAddTrain(i)}
+                className="kid-btn p-2 sm:p-2.5 rounded-2xl border-3 border-emerald-200 bg-white hover:bg-emerald-50 active:scale-95 flex flex-col items-center justify-center gap-1 transition-all shadow-md group"
+                title={`${t.label}を出発させる`}
+              >
+                <span className="text-3xl sm:text-4xl group-hover:scale-110 transition-transform">{t.emoji}</span>
+                <span className="text-xs sm:text-sm font-black text-gray-800 leading-tight">
+                  {t.label}
+                </span>
+                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full hidden md:inline-block">
+                  ＋ はしらせる
+                </span>
+              </button>
+            ))}
           </div>
 
-          {/* 運転コントローラー（出発/ストップ、汽笛、スピード、全消し） */}
+          {/* 運転コントローラー */}
           <div className="flex md:flex-col gap-2 mt-auto w-full">
             {/* GO / STOP メインボタン */}
             <button
               onClick={toggleRun}
               className={`kid-btn w-full py-3 sm:py-3.5 rounded-2xl border-4 text-base sm:text-lg font-black shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2 ${
-                isRunning
+                isRunning && activeTrains.length > 0
                   ? 'bg-gradient-to-r from-red-400 to-rose-500 border-rose-600 text-white'
                   : 'bg-gradient-to-r from-emerald-400 to-green-500 border-emerald-600 text-white'
               }`}
             >
-              <span className="text-2xl">{isRunning ? '🛑' : '🚀'}</span>
-              <span>{isRunning ? 'ストップ！' : 'しゅっぱつ！'}</span>
+              <span className="text-2xl">{isRunning && activeTrains.length > 0 ? '🛑' : '🚀'}</span>
+              <span>{isRunning && activeTrains.length > 0 ? 'ストップ！' : 'しゅっぱつ！'}</span>
             </button>
 
             {/* サブ操作列（汽笛・スピード・消しゴム） */}
@@ -861,7 +943,7 @@ export const TrainTrackGame: React.FC<TrainTrackGameProps> = ({ onHome, starsCou
               <button
                 onClick={clearTracks}
                 className="kid-btn px-3 py-2 sm:py-2.5 bg-white border-3 border-gray-300 rounded-2xl flex items-center justify-center shadow-md font-black active:scale-95 text-gray-700 hover:bg-rose-50 hover:border-rose-300"
-                title="線路を全部けす"
+                title="線路と電車をぜんぶ消す"
               >
                 <span className="text-xl">🗑️</span>
               </button>
