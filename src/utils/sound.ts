@@ -420,6 +420,31 @@ class SoundManager {
       osc.stop(now + 0.25);
     });
   }
+
+  // ポイントレール切り替え音（カチャッ！）
+  public playSwitch() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    [0, 0.06].forEach((delay, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const now = ctx.currentTime + delay;
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(idx === 0 ? 600 : 900, now);
+      osc.frequency.exponentialRampToValueAtTime(300, now + 0.05);
+
+      gain.gain.setValueAtTime(0.3, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.05);
+    });
+  }
 }
 
 export const soundManager = new SoundManager();

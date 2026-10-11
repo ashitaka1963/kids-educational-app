@@ -24,19 +24,21 @@ export const AirHockeyGame: React.FC<AirHockeyGameProps> = ({ onHome, starsCount
   const [isGameOver, setIsGameOver] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [goalBanner, setGoalBanner] = useState<string | null>(null);
+  const [canvasDims, setCanvasDims] = useState<{ w: number; h: number }>({ w: 380, h: 540 });
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const mainAreaRef = useRef<HTMLDivElement | null>(null);
   const animRef = useRef<number>(0);
 
   // ゲーム状態（RefsでRAF内でも高速管理）
   const stateRef = useRef({
-    width: 360,
-    height: 520,
-    puck: { x: 180, y: 260, vx: 0, vy: 0, radius: 18 },
-    player: { x: 180, y: 440, radius: 28 },
-    opponent: { x: 180, y: 80, radius: 28 },
+    width: 380,
+    height: 540,
+    puck: { x: 190, y: 270, vx: 0, vy: 0, radius: 20 },
+    player: { x: 190, y: 460, radius: 32 },
+    opponent: { x: 190, y: 80, radius: 32 },
     isTouching: false,
-    goalWidth: 140,
+    goalWidth: 160,
     pScore: 0,
     oScore: 0,
     gameOver: false,
@@ -82,46 +84,57 @@ export const AirHockeyGame: React.FC<AirHockeyGameProps> = ({ onHome, starsCount
     const handleResize = () => {
       const canvas = canvasRef.current;
       if (!canvas) return;
-      const parent = canvas.parentElement;
-      if (!parent) return;
 
-      const availW = parent.clientWidth - 16;
-      const availH = parent.clientHeight - 16;
+      const mainEl = mainAreaRef.current;
+      // 利用可能領域を正確に取得（ヘッダー・フッター・パディングを考慮）
+      const availW = mainEl ? mainEl.clientWidth - 12 : window.innerWidth - 16;
+      const availH = mainEl ? mainEl.clientHeight - 12 : window.innerHeight - 150;
       if (availW <= 0 || availH <= 0) return;
 
-      // アスペクト比 約 1 : 1.45
-      const aspect = 1.45;
-      let w = availW;
-      let h = w * aspect;
+      let w: number;
+      let h: number;
 
-      if (h > availH) {
-        h = availH;
-        w = h / aspect;
+      if (availW <= 640) {
+        // スマートフォン等（縦長画面）：横幅をほぼ100%活用
+        w = Math.floor(availW);
+        h = Math.floor(Math.min(availH, w * 1.4));
+      } else {
+        // PC・タブレット等（横長画面）：高さを95%以上使い切り、幅も広々！
+        h = Math.floor(Math.min(availH * 0.96, 850));
+        // 比率 1 : 1.25 〜 1 : 1.35 で広く横幅をとる
+        w = Math.floor(Math.min(availW * 0.9, h * 0.76, 680));
+        // 横幅が取れるなら最低でも520px以上を確保
+        if (availW >= 560 && w < 520) {
+          w = Math.floor(Math.min(availW * 0.9, 520));
+          h = Math.floor(Math.min(availH * 0.96, w * 1.3));
+        }
       }
-
-      // 上限を従来の420pxから900pxへ大幅拡大（タブレットやPCでも大迫力）
-      w = Math.floor(Math.min(w, 900));
-      h = Math.floor(w * aspect);
 
       canvas.width = w;
       canvas.height = h;
+      setCanvasDims({ w, h });
 
       const s = stateRef.current;
       s.width = w;
       s.height = h;
-      s.goalWidth = Math.max(130, w * 0.45);
+      s.goalWidth = Math.max(140, w * 0.46);
       s.player.x = w / 2;
-      s.player.y = h - Math.max(65, h * 0.12);
+      s.player.y = h - Math.max(70, h * 0.13);
       s.opponent.x = w / 2;
-      s.opponent.y = Math.max(65, h * 0.12);
-      s.puck.radius = Math.max(18, w * 0.052);
-      s.player.radius = Math.max(30, w * 0.088);
-      s.opponent.radius = Math.max(30, w * 0.088);
+      s.opponent.y = Math.max(70, h * 0.13);
+      s.puck.radius = Math.max(20, w * 0.054);
+      s.player.radius = Math.max(34, w * 0.09);
+      s.opponent.radius = Math.max(34, w * 0.09);
     };
 
     handleResize();
+    // DOMマウント直後の微調整のため二段階で発火
+    const rafId = requestAnimationFrame(handleResize);
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', handleResize);
+    };
   }, []);
 
   // ゲームループ
@@ -451,11 +464,20 @@ export const AirHockeyGame: React.FC<AirHockeyGameProps> = ({ onHome, starsCount
         </div>
       </div>
 
-      {/* メインゲームリンク */}
-      <div className="flex-1 flex items-center justify-center p-1 sm:p-2 relative overflow-hidden w-full">
-        <div className="relative rounded-3xl overflow-hidden shadow-2xl border-4 border-sky-400 bg-white">
+      {/* メインゲームリンク（画面全体を有効活用） */}
+      <div
+        ref={mainAreaRef}
+        className="flex-1 flex items-center justify-center p-1 sm:p-2 relative overflow-hidden w-full h-full"
+      >
+        <div
+          className="relative rounded-3xl overflow-hidden shadow-2xl border-4 border-sky-400 bg-white"
+          style={{ width: `${canvasDims.w}px`, height: `${canvasDims.h}px` }}
+        >
           <canvas
             ref={canvasRef}
+            width={canvasDims.w}
+            height={canvasDims.h}
+            style={{ width: `${canvasDims.w}px`, height: `${canvasDims.h}px` }}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
